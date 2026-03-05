@@ -1489,6 +1489,7 @@ body::before {
       <button class="auth-submit" id="signupBtn" onclick="handleSignup()">Create Account</button>
       <div class="auth-err" id="signupErr"></div>
       <div class="auth-ok"  id="signupOk"></div>
+      <button class="auth-link-btn" id="resendBtn" onclick="resendConfirmation()" style="display:none;margin-top:10px">Resend confirmation email</button>
     </div>
 
     <!-- Log In -->
@@ -1498,6 +1499,7 @@ body::before {
       <button class="auth-submit" id="loginBtn" onclick="handleLogin()">Log In</button>
       <button class="auth-link-btn" onclick="switchAuthTab('forgot')">Forgot password?</button>
       <div class="auth-err" id="loginErr"></div>
+      <button class="auth-link-btn" id="loginResendBtn" onclick="resendConfirmation()" style="display:none;margin-top:6px">Resend confirmation email</button>
     </div>
 
     <!-- Forgot Password -->
@@ -1508,6 +1510,15 @@ body::before {
       <button class="auth-link-btn" onclick="switchAuthTab('login')" style="margin-top:14px">← Back to Log In</button>
       <div class="auth-err" id="forgotErr"></div>
       <div class="auth-ok"  id="forgotOk"></div>
+    </div>
+
+    <!-- Change Password (triggered by password-recovery link) -->
+    <div id="authChangePwForm" style="display:none">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:18px">Choose a new password for your account.</p>
+      <div class="auth-field"><label class="auth-label">New Password</label><input class="auth-input" id="newPwInput" type="password" placeholder="Min. 6 characters" autocomplete="new-password"></div>
+      <button class="auth-submit" id="changePwBtn" onclick="handleChangePassword()">Update Password</button>
+      <div class="auth-err" id="changePwErr"></div>
+      <div class="auth-ok"  id="changePwOk"></div>
     </div>
   </div>
 </div>
@@ -5517,12 +5528,48 @@ function closeAuth() {
   if (m) m.classList.remove('show');
 }
 function switchAuthTab(tab) {
-  const MAP = { signup:'authSignupForm', login:'authLoginForm', forgot:'authForgotForm' };
+  const MAP = { signup:'authSignupForm', login:'authLoginForm', forgot:'authForgotForm', 'change-password':'authChangePwForm' };
   Object.entries(MAP).forEach(([k,id]) => { const el=document.getElementById(id); if(el) el.style.display=k===tab?'':'none'; });
   ['signup','login'].forEach(k => { const el=document.getElementById('tab'+k.charAt(0).toUpperCase()+k.slice(1)); if(el) el.classList.toggle('active',k===tab); });
   const row = document.getElementById('authTabsRow');
-  if (row) row.style.display = tab==='forgot' ? 'none' : '';
-  ['signupErr','signupOk','loginErr','forgotErr','forgotOk'].forEach(id => setErr(id,''));
+  if (row) row.style.display = (tab==='forgot'||tab==='change-password') ? 'none' : '';
+  // Hide resend buttons when switching away from their context
+  if (tab !== 'signup') { const b = document.getElementById('resendBtn'); if (b) b.style.display='none'; }
+  if (tab !== 'login')  { const b = document.getElementById('loginResendBtn'); if (b) b.style.display='none'; }
+  ['signupErr','signupOk','loginErr','forgotErr','forgotOk','changePwErr','changePwOk'].forEach(id => setErr(id,''));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AUTH HELPERS — RESEND + CHANGE PASSWORD
+═══════════════════════════════════════════════════════════ */
+let _pendingConfirmEmail = '';
+
+async function resendConfirmation() {
+  if (!sb || !_pendingConfirmEmail) return;
+  const btns = [document.getElementById('resendBtn'), document.getElementById('loginResendBtn')].filter(Boolean);
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Sent ✓'; });
+  const { error } = await sb.auth.resend({ type: 'signup', email: _pendingConfirmEmail });
+  if (error) {
+    btns.forEach(b => { b.disabled = false; b.textContent = 'Resend confirmation email'; });
+  } else {
+    // 60s cooldown to avoid spam
+    setTimeout(() => btns.forEach(b => { b.disabled = false; b.textContent = 'Resend confirmation email'; }), 60000);
+  }
+}
+
+async function handleChangePassword() {
+  if (!sb) return;
+  const pw = (document.getElementById('newPwInput')?.value || '').trim();
+  if (pw.length < 6) { setErr('changePwErr', 'Password must be at least 6 characters.'); return; }
+  setBtnLoading('changePwBtn', true, 'Update Password');
+  const { error } = await sb.auth.updateUser({ password: pw });
+  setBtnLoading('changePwBtn', false, 'Update Password');
+  if (error) { setErr('changePwErr', error.message); return; }
+  setOk('changePwOk', 'Password updated — logging you in…');
+  setTimeout(async () => {
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session) { currentUser = session.user; await loadAndShowApp(); }
+  }, 1200);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -5535,8 +5582,20 @@ function initAuth() {
     if (session) { currentUser = session.user; loadAndShowApp(); }
     else showLanding();
   });
-  sb.auth.onAuthStateChange((event) => {
-    if (event === 'PASSWORD_RECOVERY') openAuth('login');
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user;
+      // Auto-login only if still on landing page (not already inside the app)
+      const lp = document.getElementById('landingPage');
+      if (lp && lp.style.display !== 'none') loadAndShowApp();
+    }
+    if (event === 'PASSWORD_RECOVERY') {
+      // User clicked reset link — show change-password form
+      openAuth('change-password');
+    }
+    if (event === 'SIGNED_OUT') {
+      currentUser = null;
+    }
   });
 }
 
@@ -5600,7 +5659,10 @@ async function handleSignup() {
   if (!email.includes('@')){ setErr('signupErr','Please enter a valid email.'); return; }
   if (pw.length < 6)       { setErr('signupErr','Password must be at least 6 characters.'); return; }
   setBtnLoading('signupBtn', true, 'Create Account');
-  const { data, error } = await sb.auth.signUp({ email, password:pw, options:{ data:{ full_name:name } } });
+  const { data, error } = await sb.auth.signUp({
+    email, password:pw,
+    options:{ data:{ full_name:name }, emailRedirectTo: window.location.origin + window.location.pathname }
+  });
   setBtnLoading('signupBtn', false, 'Create Account');
   if (error) { setErr('signupErr', error.message); return; }
   if (data.session) {
@@ -5609,7 +5671,10 @@ async function handleSignup() {
     await sb.from('progress').upsert({ user_id:currentUser.id, ...defaultState(), quiz_scores:{}, phase_bonus:{}, last_visit:null }, { onConflict:'user_id', ignoreDuplicates:true });
     showApp();
   } else {
-    setOk('signupOk','Check your email to confirm your account, then log in.');
+    _pendingConfirmEmail = email;
+    setOk('signupOk', 'Check your inbox to confirm your account — may take a minute. Also check spam.');
+    const rb = document.getElementById('resendBtn');
+    if (rb) rb.style.display = '';
   }
 }
 
@@ -5622,7 +5687,18 @@ async function handleLogin() {
   setBtnLoading('loginBtn', true, 'Log In');
   const { data, error } = await sb.auth.signInWithPassword({ email, password:pw });
   setBtnLoading('loginBtn', false, 'Log In');
-  if (error) { setErr('loginErr', error.message); return; }
+  if (error) {
+    const msg = error.message || '';
+    if (msg.toLowerCase().includes('email not confirmed')) {
+      setErr('loginErr', 'Email not confirmed yet — check your inbox and spam folder.');
+      _pendingConfirmEmail = email;
+      const rb = document.getElementById('loginResendBtn');
+      if (rb) rb.style.display = '';
+    } else {
+      setErr('loginErr', msg);
+    }
+    return;
+  }
   currentUser = data.session.user;
   await loadAndShowApp();
 }
@@ -5666,6 +5742,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('authSignupForm')?.style.display !== 'none') handleSignup();
     else if (document.getElementById('authLoginForm')?.style.display !== 'none') handleLogin();
     else if (document.getElementById('authForgotForm')?.style.display !== 'none') handleForgotPassword();
+    else if (document.getElementById('authChangePwForm')?.style.display !== 'none') handleChangePassword();
   });
 });
 </script>
