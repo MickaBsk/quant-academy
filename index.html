@@ -5720,12 +5720,19 @@ async function handleForgotPassword() {
   const email = (document.getElementById('forgotEmail')?.value||'').trim();
   if (!email.includes('@')) { setErr('forgotErr','Please enter a valid email.'); return; }
   setBtnLoading('forgotBtn', true, 'Send Reset Link');
-  const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + window.location.pathname + '?reset=1'
-  });
+  const redirectTo = window.location.origin + '/';
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
   setBtnLoading('forgotBtn', false, 'Send Reset Link');
-  if (error) { setErr('forgotErr', error.message); return; }
-  setOk('forgotOk','Reset link sent — check your inbox.');
+  if (error) {
+    const msg = error.message || '';
+    if (msg.includes('rate limit') || msg.includes('too many')) {
+      setErr('forgotErr', 'Too many requests — wait a few minutes and try again.');
+    } else {
+      setErr('forgotErr', msg || 'Could not send reset email. Contact support.');
+    }
+    return;
+  }
+  setOk('forgotOk','Reset link sent — check your inbox and spam folder.');
 }
 
 async function logout() {
