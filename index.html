@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QuantForge — Master the Math of Markets</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="https://unpkg.com/@splinetool/viewer@1.0.0/build/spline-viewer.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@splinetool/viewer@1.0.76/build/spline-viewer.js"></script>
 <style>
 /* ─── TOKENS ─────────────────────────────────────────────── */
 :root {
@@ -86,9 +86,9 @@ body::before {
   letter-spacing: -1px;
 }
 .brand-name {
-  font-family: 'Syne', sans-serif;
-  font-size: 17px; font-weight: 800;
-  color: var(--heading); letter-spacing: -.02em;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px; font-weight: 700;
+  color: var(--heading); letter-spacing: -0.01em;
 }
 .brand-sub {
   display: block; font-size: 11px;
@@ -1012,8 +1012,21 @@ body::before {
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
+  position: relative;
 }
 .dash-robot spline-viewer { width: 100%; height: 100%; display: block; }
+/* ─── Hide "Built with Spline" watermark ─── */
+.dash-robot::after,
+.landing-hero-robot::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 220px; height: 44px;
+  background: var(--surface);
+  z-index: 10;
+  pointer-events: none;
+  border-radius: 0 8px 0 14px;
+}
 .continue-card {
   background: linear-gradient(135deg, rgba(0,229,255,0.07), rgba(123,92,255,0.07));
   border: 1px solid rgba(0,229,255,0.22);
@@ -1184,7 +1197,6 @@ body::before {
 }
 
 /* ─── HEADING FONT POLISH ───────────────────────────────────── */
-.brand-name { letter-spacing: -0.01em; }
 .dash-hero-left h1 { letter-spacing: -0.03em; }
 .lesson-h1 { letter-spacing: -0.025em; }
 
@@ -1240,9 +1252,9 @@ body::before {
 }
 .landing-h1 {
   font-family:'Syne',sans-serif;
-  font-size:clamp(2.5rem,5.2vw,4.2rem);
+  font-size:clamp(3.2rem,6vw,5rem);
   font-weight:800; color:var(--heading);
-  line-height:1.07; letter-spacing:-0.035em;
+  line-height:1.12; letter-spacing:-0.025em;
   -webkit-font-smoothing:antialiased; margin-bottom:14px;
 }
 .landing-h1 .grad {
@@ -1451,7 +1463,7 @@ body::before {
       </div>
     </div>
     <div class="landing-hero-robot">
-      <spline-viewer url="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode" loading="lazy"></spline-viewer>
+      <spline-viewer url="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode"></spline-viewer>
     </div>
   </div>
 
@@ -5151,7 +5163,7 @@ function renderDashboard() {
   view.innerHTML = `<div class="dash-view">
     <div class="dash-hero-split">
       <div class="dash-robot">
-        <spline-viewer url="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode" loading="lazy"></spline-viewer>
+        <spline-viewer url="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode"></spline-viewer>
       </div>
       <div class="dash-hero-left">
         <h1>${heroTitle}</h1>
