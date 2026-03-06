@@ -5724,15 +5724,20 @@ async function handleForgotPassword() {
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
   setBtnLoading('forgotBtn', false, 'Send Reset Link');
   if (error) {
-    const msg = error.message || '';
-    if (msg.includes('rate limit') || msg.includes('too many')) {
-      setErr('forgotErr', 'Too many requests — wait a few minutes and try again.');
+    const msg = (error.message || '').toLowerCase();
+    console.error('[QuantForge] resetPasswordForEmail error:', error);
+    if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('after')) {
+      setErr('forgotErr', 'Too many requests — please wait 60 seconds and try again.');
+    } else if (msg.includes('sending') || msg.includes('smtp') || msg.includes('mail')) {
+      setErr('forgotErr', 'Email delivery is unavailable right now. Please contact the admin.');
+    } else if (msg.includes('not found') || msg.includes('user')) {
+      setErr('forgotErr', 'No account found with that email.');
     } else {
-      setErr('forgotErr', msg || 'Could not send reset email. Contact support.');
+      setErr('forgotErr', error.message || 'Could not send reset email. Please try again.');
     }
     return;
   }
-  setOk('forgotOk','Reset link sent — check your inbox and spam folder.');
+  setOk('forgotOk', 'If an account exists for that email, a reset link is on its way. Check your inbox and spam.');
 }
 
 async function logout() {
